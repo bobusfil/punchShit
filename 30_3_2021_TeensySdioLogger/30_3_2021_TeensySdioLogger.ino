@@ -41,17 +41,18 @@
 //mpu9250 accelerometer interrupt pin
 #define MPU_INT_PIN 9
 
+FsFile root;
 SdFs sd;
 FsFile file;
-FsFile root;
+
 
 // RingBuf for File type FsFile.
 RingBuf<FsFile, RING_BUF_CAPACITY> rb;
 
 // SD card variables
 size_t n = 0;
-byte fileCountOnSD = 0;
 String fileName = String();
+int fileCountOnSD = 0;
 
 // Max RingBuf used bytes. Useful to understand RingBuf overrun.
 size_t maxUsed = 0;
@@ -437,19 +438,33 @@ void clearSerialInput() {
 }
 
 // Loops through the filenames on SD card and returns the next available filename.
-byte countSdFiles() {
+
+//Beep at the end of the signal
+void stopBeep(){
+  tone(buzzer, 2200);
+  delay(100);
+  noTone(buzzer);
+  tone(buzzer, 2400);
+  delay(100);
+  noTone(buzzer);
   
-    while (true){
-      FsFile entry = root.openNextFile();
-      if (!entry) {
-        // no more files
-        break;
-      }
-      // for each file count it
-      fileCountOnSD++;
-      entry.close();
-    }
-  return fileCountOnSD+1;
+}
+
+void countSdFiles(FsFile dir, int numTabs, int& fileCount) {
+   while(true) {
+     
+     FsFile entry =  dir.openNextFile();
+     if (! entry) {
+       // no more files
+       break;
+     }
+     if (entry.isDirectory()) {
+       countSdFiles(entry, numTabs+1, fileCount);
+     }else {
+        fileCount++;
+     }
+     entry.close();
+   }
 }
 
 
@@ -474,25 +489,26 @@ void setup() {
   //startButtonPush();
   // Serial.println("Starting the loop.");
   tic = millis();
-
-  // SD card preparation
+  
   // Initialize the SD.
   if (!sd.begin(SD_CONFIG)) {
     sd.initErrorHalt(&Serial);
   }
 
+  // SD card preparation
+   root = sd.open("/");
+   countSdFiles(root, 0, fileCountOnSD);
+   
   // finding the next possible filename
-  fileCountOnSD = 0;
-  int fname_num = countSdFiles();
   fileName += LOG_FILENAME_NAME;
-  fileName += fname_num;
-  fileName += LOG_FIMENAME_EXT;
-
+  fileName += fileCountOnSD-2;
+  fileName +=LOG_FIMENAME_EXT;
+  fileName = String(fileName);
   Serial.print("Next filename is: ");
   Serial.println(fileName);
-
+  
   // Open or create file - truncate existing file.
-  if (!file.open(LOG_FILENAME, O_RDWR | O_CREAT | O_TRUNC)) {
+  if (!file.open(fileName.c_str(), O_RDWR | O_CREAT | O_TRUNC)) {
     Serial.println("open failed\n");
     return;
   }
@@ -590,6 +606,7 @@ void loop() {
    // check if stop button was not pressed
    buttonPressed();
   }
+  stopBeep();
   rb.sync();
   file.truncate();
   file.rewind();
