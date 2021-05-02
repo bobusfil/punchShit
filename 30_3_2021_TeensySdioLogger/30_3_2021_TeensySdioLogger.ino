@@ -35,18 +35,24 @@
 // the buffer twice as big so that is ... good I guess.
 #define RING_BUF_CAPACITY 450*512
 #define LOG_FILENAME "SdioLogger.csv"
+#define LOG_FILENAME_NAME "test_"
+#define LOG_FIMENAME_EXT ".csv"
 
 //mpu9250 accelerometer interrupt pin
 #define MPU_INT_PIN 9
 
 SdFs sd;
 FsFile file;
+FsFile root;
 
 // RingBuf for File type FsFile.
 RingBuf<FsFile, RING_BUF_CAPACITY> rb;
 
 // SD card variables
 size_t n = 0;
+byte fileCountOnSD = 0;
+String fileName = String();
+
 // Max RingBuf used bytes. Useful to understand RingBuf overrun.
 size_t maxUsed = 0;
 
@@ -430,6 +436,23 @@ void clearSerialInput() {
   }
 }
 
+// Loops through the filenames on SD card and returns the next available filename.
+byte countSdFiles() {
+  
+    while (true){
+      FsFile entry = root.openNextFile();
+      if (!entry) {
+        // no more files
+        break;
+      }
+      // for each file count it
+      fileCountOnSD++;
+      entry.close();
+    }
+  return fileCountOnSD+1;
+}
+
+
 void setup() {
   // pin Settings
   pinMode(buzzer, OUTPUT);
@@ -457,6 +480,16 @@ void setup() {
   if (!sd.begin(SD_CONFIG)) {
     sd.initErrorHalt(&Serial);
   }
+
+  // finding the next possible filename
+  fileCountOnSD = 0;
+  int fname_num = countSdFiles();
+  fileName += LOG_FILENAME_NAME;
+  fileName += fname_num;
+  fileName += LOG_FIMENAME_EXT;
+
+  Serial.print("Next filename is: ");
+  Serial.println(fileName);
 
   // Open or create file - truncate existing file.
   if (!file.open(LOG_FILENAME, O_RDWR | O_CREAT | O_TRUNC)) {
