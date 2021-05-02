@@ -496,6 +496,7 @@ void setup() {
   // beginning of the analog Timer
   analogTimer.begin(analogTimeInt, 100);
   analogTimer.priority(150);  
+  logTime = micros();
 }
 
 void loop() {
