@@ -70,13 +70,13 @@ float hisma2 = 1000000;
 float lambda = 0.99;
 float lambda2 = 0.9995;
 byte label1,label2 = 0;
-uint32_t punchThr1,punchThr2 = 7000000;
+uint32_t punchThr = 7000000;
 
 
 uint32_t logTime = 0;
 uint32_t analogLogTime = 0;
-int count1 = 0;
-int count2 = 0;
+byte count1 = 0;
+byte count2 = 0;
 uint32_t cumVal1 = 0;
 uint32_t cumVal2 = 0;
 int punchCount = 0;
@@ -86,8 +86,6 @@ bool sigBelowThr2 = true;
 
 bool buzzState = false;
 uint32_t buzzerTime = 0;
-uint16_t tic = 0;
-uint16_t toc = 0;
 int16_t data[3];
 
 //flags
@@ -124,7 +122,7 @@ void analogTimeInt(){
 // pins
 byte buzzer = 2;
 byte startBtn = 3;
-byte analogAccel1 = 23;
+byte analogAccel1 = 21;
 byte analogAccel2 = 22;
 byte button2 = 3;
 
@@ -218,6 +216,7 @@ void analogSigProcessing(){
   // squaring signal makes it non-negative and increase the hight ot the spikes
     // hand #1
     int32_t sum1 = sq(ay1);
+    
     // hand #2
     int32_t sum2 = sq(ay2);
     
@@ -251,9 +250,8 @@ void analogSigProcessing(){
 
     // if signal breaches the Threshold from the bottom up
     // hand #1
-    
     if (MA1 > thr1) {
-    
+
       if (sigBelowThr1 == true) {
 
         // breach from the bottom up
@@ -290,21 +288,22 @@ void analogSigProcessing(){
     }
 
     // Accumulating the values of MA while breached above the thr
+    
     // hand #1
     if (breachFlag1 == true) {
       if (count1 < 100) {
         cumVal1 += MA1;
         count1++;
       } else {
-        // breachFlag1 == true && count1 >= 100
-
-        if (cumVal1 > punchThr1) {
+        // breachFlag1 == true && count1 >= 100     
+        if (cumVal1 > punchThr) {
           // Punch is detected, disabling the accumulation of samples and detection algo
           breachFlag1 = false;
           punchFlag1 = true;
+          
         } else {
           // accumulated value was smaller than punchThr
-          Serial.print("CumVal1: ");
+          Serial.print(F("CumVal1: "));
           Serial.println(cumVal1 / 1000000);
           breachFlag1 = false;
         }
@@ -317,21 +316,20 @@ void analogSigProcessing(){
 
     // hand #2
     if (breachFlag2 == true) {
-      
       if (count2 < 100) {
         cumVal2 += MA2;
         count2++;
       } else {
         // breachFlag2 == true && count2 >= 100
-
-        if (cumVal2 > punchThr2) {
+        Serial.println(cumVal2);
+        if (cumVal2 > punchThr) {
           // Punch is detected, disabling the accumulation of samples and detection algo
           breachFlag2 = false;
           punchFlag2 = true;
           
         } else {
           // accumulated value was smaller than punchThr
-          Serial.print("CumVal2: ");
+          Serial.print(F("CumVal2: "));
           Serial.println(cumVal2 / 1000000);
           breachFlag2 = false;
         }
@@ -371,11 +369,11 @@ void logData() {
       rb.sync();
       file.truncate();
       file.rewind();
-      Serial.print("fileSize: ");
+      Serial.print(F("fileSize: "));
       Serial.println((uint32_t)file.fileSize());
-      Serial.print("maxBytesUsed: ");
+      Serial.print(F("maxBytesUsed: "));
       Serial.println(maxUsed);
-      Serial.print("minSpareMicros: ");
+      Serial.print(F("minSpareMicros: "));
       Serial.println(minSpareMicros);
       file.close();
     }
@@ -388,7 +386,7 @@ void logData() {
       // Not busy only allows one sector before possible busy wait.
       // Write one sector from RingBuf to file.
       if (512 != rb.writeOut(512)) {
-        Serial.println("writeOut failed");
+        Serial.println(F("writeOut failed"));
         while(1){}
       }
     }
@@ -402,7 +400,7 @@ void logData() {
     }
     
     if (spareMicros <= 0) {
-      Serial.print("Rate too fast ");
+      Serial.print(F("Rate too fast "));
       Serial.println(spareMicros);
       while(1){}
     }  
@@ -423,7 +421,7 @@ void logData() {
     
     if (rb.getWriteError()) {
       // Error caused by too few free bytes in RingBuf.
-      Serial.println("WriteError");
+      Serial.println(F("WriteError"));
       while(1){}
     }
 }
@@ -474,7 +472,7 @@ void setup() {
   pinMode(button2, INPUT_PULLUP);
   
   Serial.begin(9600);
-  while (!Serial) {}
+  //while (!Serial) {}
   // setting 12 bit resolution
   
   analogReadResolution(12);
@@ -487,7 +485,6 @@ void setup() {
   // Serial.println("Push button to start");
   //startButtonPush();
   // Serial.println("Starting the loop.");
-  tic = millis();
   
   // Initialize the SD.
   if (!sd.begin(SD_CONFIG)) {
@@ -503,19 +500,19 @@ void setup() {
   fileName += fileCountOnSD-2;
   fileName +=LOG_FIMENAME_EXT;
   fileName = String(fileName);
-  Serial.print("Next filename is: ");
+  Serial.print(F("Next filename is: "));
   Serial.println(fileName);
   
   // Open or create file - truncate existing file.
   if (!file.open(fileName.c_str(), O_RDWR | O_CREAT | O_TRUNC)) {
-    Serial.println("open failed\n");
+    Serial.println(F("open failed\n"));
     return;
   }
 
   // File must be pre-allocated to avoid huge
   // delays searching for free clusters.
   if (!file.preAllocate(LOG_FILE_SIZE)) {
-    Serial.println("preAllocate failed\n");
+    Serial.println(F("preAllocate failed\n"));
     file.close();
     return;
   }
@@ -528,9 +525,9 @@ void setup() {
   //MPU9250 setup
   status = IMU.mybegin();
   if (status < 0) {
-    Serial.println("IMU initialization unsuccessful");
-    Serial.println("Check IMU wiring or try cycling power");
-    Serial.print("Status: ");
+    Serial.println(F("IMU initialization unsuccessful"));
+    Serial.println(F("Check IMU wiring or try cycling power"));
+    Serial.print(F("Status: "));
     Serial.println(status);
     while(1) {}
   }
@@ -608,11 +605,11 @@ void loop() {
   rb.sync();
   file.truncate();
   file.rewind();
-  Serial.print("fileSize: ");
+  Serial.print(F("fileSize: "));
   Serial.println((uint32_t)file.fileSize());
-  Serial.print("maxBytesUsed: ");
+  Serial.print(F("maxBytesUsed: "));
   Serial.println(maxUsed);
-  Serial.print("minSpareMicros: ");
+  Serial.print(F("minSpareMicros: "));
   Serial.println(minSpareMicros);
   file.close();
   while(1){}
