@@ -409,7 +409,6 @@ void logData() {
   
     // Print acceleration into RingBuf.
     ringBuffWrite();
-
     if(punchFlag1 == true){
       punchFlag1 = false;
       punchCount = punchCount + 1;
@@ -549,7 +548,7 @@ void setup() {
 }
 
 void loop() {
-  while(!Serial.available() && stopButtonFlag == false){
+  while(stopButtonFlag == false){
   // check if its time for digital data (takes up 13 usec)
   if(digiTimeFlag == true){
     //Serial.write(',');
@@ -591,7 +590,6 @@ void loop() {
   
   // setting labels for the data
   labelSetter();
-  
   // saving the digital data to the sd card (10-12 usecs)
   if(digiDataReadyFlag == true){
     digiDataReadyFlag = false;
